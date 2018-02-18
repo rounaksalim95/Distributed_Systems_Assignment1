@@ -21,12 +21,13 @@ def register_pub(address, broker_address, topic, ownership_strength = 0, history
     print("Registering publisher with broker") 
     socket = context.socket(zmq.REQ)
     socket.connect(broker_address)
-    values = address + "," + topic + "," + ownership_strength + "," + history
-    socket.send(address.encode())   # encode() uses utf-8 encoding by default 
-    
+    values = "pub" + "," + address + "," + topic + "," + str(ownership_strength) + "," + str(history)
+    socket.send(values.encode())   # encode() uses utf-8 encoding by default 
     response = socket.recv()
+    context.destroy()
     return response
 
+# This function is not required if we directly connect the publishers to the subscribers 
 '''
 Function that the publisher can use to publish data through this middleware/wrapper
 topic: Topic for which content is being published 
@@ -39,18 +40,39 @@ def publish(topic, content):
 # Wrapper functions that are useful for the subscribers 
 '''
 Function that can be called to register the subscriber with the broker 
+Returns the address of the best publisher available 
+broker_address: Address of the broker that the request needs to be sent to (including protocol)
 topic: Topic that the subscriber wants to subscribe to 
 history: The amount of history that the subscriber wants the publisher to maintain (default value is 0)
 Returns publisher that the subscriber should subscribe to 
 '''
-def register_sub(topic, history = 0):
-    pass
+def register_sub(broker_address, topic, history = 0):
+    context = zmq.Context()
+    print("Registering subscriber with broker") 
+    socket = context.socket(zmq.REQ)
+    socket.connect(broker_address)
+    values = "sub" + "," + topic + "," + str(history)
+    socket.send(values.encode())   # encode() uses utf-8 encoding by default 
+    response = socket.recv()
+    context.destroy()
+    return response
 
 '''
-Function that the subscriber can use to inform the broker that it has lost the publisher it was connected to 
+Function that the subscriber can use to inform the broker that it has lost the publisher it was connected to;
+broker responds by providing next best publisher 
+Returns the address of the next best publisher available 
+broker_address: Address of the broker that the request needs to be sent to (including protocol)
 publisher: The publisher that the subscriber was subscribed to (this can be used by the broker to remove the inactive publisher)
 topic: Topic that the subscriber wants to subscribe to 
 history: The amount of history that the subscriber wants the publisher to maintain (default value is 0)
 '''
-def notify(publisher, topic, history = 0):
-    pass
+def notify(broker_address, publisher, topic, history = 0):
+    context = zmq.Context()
+    print("Notifying broker that the publisher got disconnected")
+    socket = context.socket(zmq.REQ)
+    socket.connect(broker_address)
+    values = "disconnect" + "," + publisher + "," + topic + str(history)
+    socket.send(values.encode())    # encode() uses utf-8 encoding by defualt 
+    response = socket.recv()
+    context.destroy()
+    return response
