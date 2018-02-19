@@ -21,8 +21,8 @@ def register_pub(address, broker_address, topic, ownership_strength = 0, history
     print("Registering publisher with broker") 
     socket = context.socket(zmq.REQ)
     socket.connect(broker_address)
-    values = "pub" + "," + address + "," + topic + "," + str(ownership_strength) + "," + str(history)
-    socket.send(values.encode())   # encode() uses utf-8 encoding by default 
+    values = {'type': 'pub', 'addr': address, 'topic': topic, 'ownStr': ownership_strength, 'history': history}
+    socket.send_pyobj(values)
     response = socket.recv()
     context.destroy()
     return response
@@ -51,8 +51,8 @@ def register_sub(broker_address, topic, history = 0):
     print("Registering subscriber with broker") 
     socket = context.socket(zmq.REQ)
     socket.connect(broker_address)
-    values = "sub" + "," + topic + "," + str(history)
-    socket.send(values.encode())   # encode() uses utf-8 encoding by default 
+    values = {'type': 'sub', 'topic': topic, 'history': history}
+    socket.send_pyobj(values)
     response = socket.recv()
     context.destroy()
     return response

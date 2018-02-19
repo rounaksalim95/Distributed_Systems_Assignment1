@@ -11,7 +11,6 @@ test_address = "tcp://*:7777"
 # Start listening for publishers and subscribers 
 socket = middleware.start_listening(test_address)
 
-
 # Some helper functions 
 '''
 Function that adds the provided publisher to topics_dict
@@ -20,8 +19,8 @@ Publisher is of the form : (address, ownership_strength, history)
 '''
 def add_publisher(publisher_info):
     print(publisher_info)
-    topic = publisher_info[2]
-    publisher = (publisher_info[1], int(publisher_info[3]), int(publisher_info[4]))
+    topic = publisher_info['topic']
+    publisher = (publisher_info['addr'], int(publisher_info['ownStr']), int(publisher_info['history']))
     if topic in topics_dict:
         topics_dict[topic].add(publisher)
     else: 
@@ -31,10 +30,10 @@ def add_publisher(publisher_info):
 
 # Listen to incoming publisher and subscriber requests 
 while True: 
-    message = socket.recv().decode()    # decode uses utf-8 encoding by default 
-    parts = message.split(',')
+    msgDict = socket.recv_pyobj()
+
     # If publisher makes request then add them to topics_dict appropriately 
-    if (parts[0] == 'pub'): 
-        add_publisher(parts)
+    if msgDict['type'] == 'pub':
+        add_publisher(msgDict)
         socket.send(b"Added publisher")
         print(topics_dict)
