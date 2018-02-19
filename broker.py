@@ -16,6 +16,7 @@ socket = middleware.start_listening(test_address)
 '''
 Function that adds the provided publisher to topics_dict
 publisher_info: Information on the publisher 
+Publisher is of the form : (address, ownership_strength, history)
 '''
 def add_publisher(publisher_info):
     print(publisher_info)
