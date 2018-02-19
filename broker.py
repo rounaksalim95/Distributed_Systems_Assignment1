@@ -1,4 +1,4 @@
-# Requires sortedcontainers (pip install sortedcontainers)
+# Requires sortedcontainers for maintaining sorted list efficiently (pip install sortedcontainers)
 
 import middleware
 from sortedcontainers import SortedListWithKey
