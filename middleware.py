@@ -4,8 +4,71 @@ functions for the publisher, subscriber, and broker to use
 '''
 
 import zmq
+from sortedcontainers import SortedListWithKey
 
-# Wrapper functions that are useful for the publishers 
+default_address = "tcp://*:7777"
+
+
+class Broker:
+    def __init__(self, addr = default_address):
+        self.addr = addr
+        self.context = zmq.Context()
+        self.socket = self.context.socket(zmq.REP)
+
+        # Dictionary that topics to sorted lists that keep track of the avaialable publishers (sorted on ownership strength)
+        self.topics_dict = {}
+
+        '''
+        Funtion that binds a socket for the broker to receive messages from the publishers and subscribers 
+        Returns the bound socket 
+        address: Address to bind the socket to (include protocol)
+        '''
+        print('Binding socket to ', self.addr)
+        self.socket.bind(self.addr)
+
+    # Some helper functions
+    '''
+    Funtion that destroys the provided socket  
+    socket: Socket to destroy 
+    '''
+    def stop_listening(self):
+        self.socket.destroy()
+        print("Socket destroyed")
+
+    '''
+    Function that adds the provided publisher to topics_dict
+    publisher_info: Information on the publisher 
+    Publisher is of the form : (address, ownership_strength, history)
+    '''
+    def add_publisher(self, publisher_info):
+        print(publisher_info)
+        topic = publisher_info['topic']
+        publisher = (publisher_info['addr'], int(publisher_info['ownStr']), int(publisher_info['history']))
+        if topic in self.topics_dict:
+            self.topics_dict[topic].add(publisher)
+        else:
+            self.topics_dict[topic] = SortedListWithKey(key=lambda x: -x[1])
+            self.topics_dict[topic].add(publisher)
+
+    def run(self):
+        # TODO: How to terminate loop?
+        # Listen to incoming publisher and subscriber requests
+        while True:
+            msg_dict = self.socket.recv_pyobj()
+
+            # If publisher makes request then add them to topics_dict appropriately
+            if msg_dict['type'] == 'pub':
+                self.add_publisher(msg_dict)
+                self.socket.send(b"Added publisher")
+                print(self.topics_dict)
+
+            if msg_dict['type'] == 'shutdown:':
+                break
+        # End while. Shutdown broker.
+        self.stop_listening()
+
+
+# Wrapper functions that are useful for the publishers
 '''
 Function that can be called to register the publisher with the broker 
 Returns the response received by the broker 
@@ -76,25 +139,3 @@ def notify(broker_address, publisher, topic, history = 0):
     response = socket.recv()
     context.destroy()
     return response
-
-
-# Wrapper functions that are useful for the broker 
-'''
-Funtion that binds a socket for the broker to receive messages from the publishers and subscribers 
-Returns the bound socket 
-address: Address to bind the socket to (include protocol)
-'''
-def start_listening(address):
-    context = zmq.Context()
-    print('Binding socket to ', address) 
-    socket = context.socket(zmq.REP)
-    socket.bind(address) 
-    return socket 
-
-'''
-Funtion that destroys the provided socket  
-socket: Socket to destroy 
-'''
-def stop_listening(socket):
-    socket.destroy()
-    print("Socket destroyed") 
