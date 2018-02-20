@@ -72,7 +72,7 @@ def notify(broker_address, publisher, topic, history = 0):
     socket = context.socket(zmq.REQ)
     socket.connect(broker_address)
     values = {'type': 'disconnect', 'addr': publisher, 'topic': topic, 'history': history}
-    socket.send(values)    # encode() uses utf-8 encoding by defualt 
+    socket.send_pyobj(values)
     response = socket.recv()
     context.destroy()
     return response

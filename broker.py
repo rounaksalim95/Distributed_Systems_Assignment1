@@ -3,7 +3,6 @@
 import middleware
 from sortedcontainers import SortedListWithKey
 
-
 # Dictionary that topics to sorted lists that keep track of the avaialable publishers (sorted on ownership strength)
 topics_dict = {}
 
@@ -27,12 +26,31 @@ def add_publisher(publisher_info):
         topics_dict[topic] = SortedListWithKey(key=lambda x: -x[1])
         topics_dict[topic].add(publisher)
 
+'''
+Function that searches for the best available publisher based on the requirements of the subscriber 
+topic: Topic that the subscriber wants to subscribe to 
+history: Minimum history that the subscriber is looking for 
+'''
+def find_publisher(topic, history): 
+    if (topic in topics_dict and len(topics_dict[topic]) > 0):
+        for lst in topics_dict[topic]: 
+            if lst[2] >= history:
+                return lst[0]
+    
+    # Return None if no publishers for the topic or not enough history maintained 
+    return None
 
 # Listen to incoming publisher and subscriber requests 
 while True: 
-    msgDict = socket.recv_pyobj()
+    msg_dict = socket.recv_pyobj()
 
     # If publisher makes request then add them to topics_dict appropriately 
-    if msgDict['type'] == 'pub':
-        add_publisher(msgDict)
+    if msg_dict['type'] == 'pub':
+        add_publisher(msg_dict)
         socket.send(b"Added publisher")
+    elif msg_dict['type'] == 'sub':
+        address = find_publisher(msg_dict['topic'], msg_dict['history'])
+        if address != None: 
+            socket.send(address.encode())   # encode() uses utf-8 encoding by default 
+        else:
+            socket.send(b"None")
