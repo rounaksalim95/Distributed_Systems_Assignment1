@@ -36,4 +36,3 @@ while True:
     if msgDict['type'] == 'pub':
         add_publisher(msgDict)
         socket.send(b"Added publisher")
-        print(topics_dict)

@@ -71,8 +71,8 @@ def notify(broker_address, publisher, topic, history = 0):
     print("Notifying broker that the publisher got disconnected")
     socket = context.socket(zmq.REQ)
     socket.connect(broker_address)
-    values = "disconnect" + "," + publisher + "," + topic + str(history)
-    socket.send(values.encode())    # encode() uses utf-8 encoding by defualt 
+    values = {'type': 'disconnect', 'addr': publisher, 'topic': topic, 'history': history}
+    socket.send(values)    # encode() uses utf-8 encoding by defualt 
     response = socket.recv()
     context.destroy()
     return response
