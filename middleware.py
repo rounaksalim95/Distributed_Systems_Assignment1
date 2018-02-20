@@ -4,6 +4,7 @@ functions for the publisher, subscriber, and broker to use
 '''
 
 import zmq
+import socket
 from sortedcontainers import SortedListWithKey
 
 default_broker_pub_address = "tcp://*:7778"
@@ -49,12 +50,12 @@ class Broker:
     '''
     Function that adds the provided publisher to topics_dict
     publisher_info: Information on the publisher 
-    Publisher is of the form : (address, ownership_strength, history)
+    Publisher is of the form : (address, ownership_strength, history count, history list)
     '''
     def add_publisher(self, publisher_info):
         # print(publisher_info)
         topic = publisher_info['topic']
-        publisher = (publisher_info['addr'], int(publisher_info['ownStr']), int(publisher_info['history']))
+        publisher = (publisher_info['addr'], int(publisher_info['ownStr']), int(publisher_info['history']), [])
         if topic in self.topics_dict:
             self.topics_dict[topic].add(publisher)
         else:
@@ -103,18 +104,23 @@ class Broker:
                 self.rep_socket.send_pyobj(response)
                 print(self.topics_dict)
 
+            elif msg_dict['type'] == 'sub_reg':
+                address = self.find_publisher(msg_dict['topic'], msg_dict['history'])
+                if address is not None:
+                    temp_history = self.history[msg_dict['topic']]
+                    response = {'type': 'sub_reg', }
+                    self.rep_socket.send(address.encode())  # encode() uses utf-8 encoding by default
+                else:
+                    self.rep_socket.send(b"None")
+
+            elif msg_dict['type'] == 'pub':
+                pass
+
             # No one actually sends this at the moment
             elif msg_dict['type'] == 'shutdown':
                 response = {'type': 'shutdown', 'result': 1}
                 self.rep_socket.send_pyobj(response)
                 break
-
-            elif msg_dict['type'] == 'sub':
-                address = self.find_publisher(msg_dict['topic'], msg_dict['history'])
-                if address is not None:
-                    self.rep_socket.send(address.encode())  # encode() uses utf-8 encoding by default
-                else:
-                    self.rep_socket.send(b"None")
 
             elif msg_dict['type'] == 'disconnect':
                 self.remove_publisher(msg_dict['addr'], msg_dict['topic'], msg_dict['history'])
@@ -132,12 +138,27 @@ class Broker:
         self.stop_listening()
 
 
+# I don't like this, but it works. Other methods only reported 127.0.0.1 (IPv4) or ::1 (IPv6).
+# Found on stack overflow https://stackoverflow.com/a/28950776/9221126
+def get_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        s.connect(('10.255.255.255', 1))
+        IP = s.getsockname()[0]
+    except:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
+
 class Client:
     def __init__(self,
                  req_addr = client_connect_req_address,
                  sub_addr = client_connect_sub_address):
         self.sub_addr = sub_addr
         self.req_addr = req_addr
+        self.ip = get_ip()
         self.context = zmq.Context()
         self.req_socket = self.context.socket(zmq.REQ)
         self.sub_socket = self.context.socket(zmq.SUB)
@@ -162,6 +183,7 @@ class Client:
         else:
             print('Client init failed')
 
+
     # Wrapper functions that are useful for the publishers
     '''
     Function that can be called to register the publisher with the broker 
@@ -173,9 +195,9 @@ class Client:
     history: The amount of history that the publisher maintains (default value is 0)
     Broker receives values in the following form: address,topic,ownership_strength,history (csv)
     '''
-    def register_pub(self, address, topic, ownership_strength = 0, history = 0):
+    def register_pub(self, topic, ownership_strength = 0, history = 0):
         print("Registering publisher with broker")
-        values = {'type': 'pub_reg', 'addr': address, 'topic': topic, 'ownStr': ownership_strength, 'history': history}
+        values = {'type': 'pub_reg', 'addr': self.ip, 'topic': topic, 'ownStr': ownership_strength, 'history': history}
         self.req_socket.send_pyobj(values)
         response = self.req_socket.recv_pyobj()
         return response
@@ -187,7 +209,10 @@ class Client:
     content: The content that is being published 
     '''
     def publish(self, topic, content):
-        pass
+        pub_msg = {'type': 'pub', 'topic': topic, 'content': content}
+        self.req_socket.send_pyobj(pub_msg)
+        response = self.req_socket.recv_pyobj()
+        return response
 
 
     # Wrapper functions that are useful for the subscribers
@@ -202,7 +227,7 @@ class Client:
     def register_sub(self, topic, history = 0):
         # FIXME: Really dont have to register with broker under current architecture. Just use zmq_setsockopt
         print("Registering subscriber with broker")
-        values = {'type': 'sub', 'topic': topic, 'history': history}
+        values = {'type': 'sub_reg', 'topic': topic, 'history': history}
         self.req_socket.send_pyobj(values)
         response = self.req_socket.recv_pyobj()
         return response
