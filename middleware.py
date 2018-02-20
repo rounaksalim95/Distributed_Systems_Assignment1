@@ -50,6 +50,33 @@ class Broker:
             self.topics_dict[topic] = SortedListWithKey(key=lambda x: -x[1])
             self.topics_dict[topic].add(publisher)
 
+    '''
+    Function that searches for the best available publisher based on the requirements of the subscriber 
+    topic: Topic that the subscriber wants to subscribe to 
+    history: Minimum history that the subscriber is looking for 
+    '''
+    def find_publisher(self, topic, history):
+        if topic in self.topics_dict and len(self.topics_dict[topic]) > 0:
+            for lst in self.topics_dict[topic]:
+                if lst[2] >= history:
+                    return lst[0]
+
+        # Return None if no publishers for the topic or not enough history maintained
+        return None
+
+    '''
+    Function that removes a disconnected publisher from the list of publishers 
+    publisher: Address of the publisher that got disconnected 
+    topic: Topic that the publisher was serving content for  
+    '''
+    def remove_publisher(self, publisher, topic, history):
+        if topic in self.topics_dict and len(self.topics_dict[topic]) > 0:
+            lists = self.topics_dict[topic]
+            for i in range(len(lists)):
+                if lists[i][0] == publisher and lists[i][2] == history:
+                    lists.pop(i)
+                    break
+
     def run(self):
         # TODO: How to terminate loop?
         # Listen to incoming publisher and subscriber requests
@@ -64,6 +91,17 @@ class Broker:
 
             if msg_dict['type'] == 'shutdown:':
                 break
+
+            elif msg_dict['type'] == 'sub':
+                address = self.find_publisher(msg_dict['topic'], msg_dict['history'])
+                if address != None:
+                    self.socket.send(address.encode())  # encode() uses utf-8 encoding by default
+                else:
+                    self.socket.send(b"None")
+
+            elif msg_dict['type'] == 'disconnect':
+                self.remove_publisher(msg_dict['addr'], msg_dict['topic'], msg_dict['history'])
+                self.socket.send(b"ACK")
         # End while. Shutdown broker.
         self.stop_listening()
 
@@ -84,7 +122,7 @@ def register_pub(address, broker_address, topic, ownership_strength = 0, history
     print("Registering publisher with broker") 
     socket = context.socket(zmq.REQ)
     socket.connect(broker_address)
-    values = {'type': 'pub', 'addr': address, 'topic': topic, 'ownStr': ownership_strength, 'history': history}
+    values = {'type': 'pub', 'addr': address, 'topic': topic, 'own_str': ownership_strength, 'history': history}
     socket.send_pyobj(values)
     response = socket.recv()
     context.destroy()
@@ -134,8 +172,8 @@ def notify(broker_address, publisher, topic, history = 0):
     print("Notifying broker that the publisher got disconnected")
     socket = context.socket(zmq.REQ)
     socket.connect(broker_address)
-    values = "disconnect" + "," + publisher + "," + topic + str(history)
-    socket.send(values.encode())    # encode() uses utf-8 encoding by defualt 
+    values = {'type': 'disconnect', 'addr': publisher, 'topic': topic, 'history': history}
+    socket.send_pyobj(values)
     response = socket.recv()
     context.destroy()
     return response
