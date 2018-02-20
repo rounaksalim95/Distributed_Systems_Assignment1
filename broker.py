@@ -43,7 +43,7 @@ def find_publisher(topic, history):
 '''
 Function that removes a disconnected publisher from the list of publishers 
 publisher: Address of the publisher that got disconnected 
-topic: Topic that the publisher was serving content for 
+topic: Topic that the publisher was serving content for  
 '''
 def remove_publisher(publisher, topic, history):
     if (topic in topics_dict and len(topics_dict[topic]) > 0):
