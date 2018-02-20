@@ -21,7 +21,7 @@ def register_pub(address, broker_address, topic, ownership_strength = 0, history
     print("Registering publisher with broker") 
     socket = context.socket(zmq.REQ)
     socket.connect(broker_address)
-    values = {'type': 'pub', 'addr': address, 'topic': topic, 'ownStr': ownership_strength, 'history': history}
+    values = {'type': 'pub', 'addr': address, 'topic': topic, 'own_str': ownership_strength, 'history': history}
     socket.send_pyobj(values)
     response = socket.recv()
     context.destroy()
