@@ -1,6 +1,9 @@
-import middleware
+from middleware import Client
 
-response = middleware.register_pub("my_address", "tcp://localhost:7777", "Test", ownership_strength=10)
+client = Client()
+
+result = client.register_pub("my address", "tcp://localhost:7777")
+print(result)
 # response = middleware.register_sub("tcp://localhost:7777", "Test")
 
-print(response)
+#print(response)
