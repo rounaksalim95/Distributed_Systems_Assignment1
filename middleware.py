@@ -5,6 +5,7 @@ functions for the publisher, subscriber, and broker to use
 
 import zmq
 import socket
+import collections
 from sortedcontainers import SortedListWithKey
 
 default_broker_pub_address = "tcp://*:7778"
@@ -55,38 +56,59 @@ class Broker:
     def add_publisher(self, publisher_info):
         # print(publisher_info)
         topic = publisher_info['topic']
-        publisher = (publisher_info['addr'], int(publisher_info['ownStr']), int(publisher_info['history']), [])
+        publisher = {'addr': publisher_info['addr'],
+                     'ownStr': int(publisher_info['ownStr']),
+                     'history_cnt': int(publisher_info['history_cnt']),
+                     'history_deque': collections.deque(maxlen=publisher_info['history_cnt'])}
         if topic in self.topics_dict:
             self.topics_dict[topic].add(publisher)
         else:
-            # Created new sorted list sorted by -x[1] (negative of ownership strength)
-            self.topics_dict[topic] = SortedListWithKey(key=lambda x: -x[1])
+            # Created new sorted list sorted by -x['ownStr'] (negative of ownership strength)
+            self.topics_dict[topic] = SortedListWithKey(key=lambda x: -x['ownStr'])
             self.topics_dict[topic].add(publisher)
 
     '''
     Function that searches for the best available publisher based on the requirements of the subscriber 
     topic: Topic that the subscriber wants to subscribe to 
-    history: Minimum history that the subscriber is looking for 
+    history_cnt (Optional): Minimum history that the subscriber is looking for 
+    addr (Optional): Unique publisher address desired
     '''
-    def find_publisher(self, topic, history):
+    def find_publisher(self, topic, history_cnt=None, addr=None):
         if topic in self.topics_dict and len(self.topics_dict[topic]) > 0:
-            for lst in self.topics_dict[topic]:
-                if lst[2] >= history:
-                    return lst[0]
+            for publisher in self.topics_dict[topic]:
+                if history_cnt is not None:
+                    if publisher['history_cnt'] >= history_cnt:
+                        history_satisfied = True
+                    else:
+                        history_satisfied = False
+                else:
+                    history_satisfied = True
 
-        # Return None if no publishers for the topic or not enough history maintained
+                if addr is not None:
+                    if publisher['addr'] == addr:
+                        addr_satisfied = True
+                    else:
+                        addr_satisfied = False
+                else:
+                    addr_satisfied = True
+
+                if history_satisfied and addr_satisfied:
+                    return publisher
+
+        # Return None if no publishers for the topic, not enough history maintained, or incorrect address
         return None
 
     '''
     Function that removes a disconnected publisher from the list of publishers 
-    publisher: Address of the publisher that got disconnected 
+    publisher_addr: Address of the publisher that got disconnected 
     topic: Topic that the publisher was serving content for  
     '''
-    def remove_publisher(self, publisher, topic, history):
+    def remove_publisher(self, publisher_addr, topic):
         if topic in self.topics_dict and len(self.topics_dict[topic]) > 0:
             lists = self.topics_dict[topic]
             for i in range(len(lists)):
-                if lists[i][0] == publisher and lists[i][2] == history:
+                # Address should be unique, so this check is sufficient
+                if lists[i]['addr'] == publisher_addr:
                     lists.pop(i)
                     break
 
@@ -100,38 +122,46 @@ class Broker:
             # If publisher makes request then add them to topics_dict appropriately
             if msg_dict['type'] == 'pub_reg':
                 self.add_publisher(msg_dict)
-                response = {'type': 'pub_reg', 'result': 1}
+                response = {'type': 'pub_reg', 'result': True}
                 self.rep_socket.send_pyobj(response)
                 print(self.topics_dict)
 
             elif msg_dict['type'] == 'sub_reg':
-                address = self.find_publisher(msg_dict['topic'], msg_dict['history'])
-                if address is not None:
-                    temp_history = self.history[msg_dict['topic']]
-                    response = {'type': 'sub_reg', }
-                    self.rep_socket.send(address.encode())  # encode() uses utf-8 encoding by default
+                publisher = self.find_publisher(msg_dict['topic'], history_cnt=msg_dict['history_cnt'])
+                print(publisher)
+                if publisher is not None:
+                    response = {'type': 'sub_reg', 'result': True, 'history': publisher['history_deque']}
+                    self.rep_socket.send_pyobj(response)  # encode() uses utf-8 encoding by default
                 else:
-                    self.rep_socket.send(b"None")
+                    response = {'type': 'sub_reg', 'result': False}
+                    self.rep_socket.send_pyobj(response)
 
             elif msg_dict['type'] == 'pub':
+                publisher = self.find_publisher(msg_dict['topic'], addr=msg_dict['addr'])
+                publisher['history_deque'].append(msg_dict['content'])
+                print(self.topics_dict)
+                self.pub_socket.send_string(msg_dict['topic'], zmq.SNDMORE)
+                self.pub_socket.send_pyobj(msg_dict['content'])
+                response = {'type': 'pub', 'result': True}
+                self.rep_socket.send_pyobj(response)
                 pass
 
             # No one actually sends this at the moment
             elif msg_dict['type'] == 'shutdown':
-                response = {'type': 'shutdown', 'result': 1}
+                response = {'type': 'shutdown', 'result': True}
                 self.rep_socket.send_pyobj(response)
                 break
 
             elif msg_dict['type'] == 'disconnect':
-                self.remove_publisher(msg_dict['addr'], msg_dict['topic'], msg_dict['history'])
+                self.remove_publisher(msg_dict['addr'], msg_dict['topic'])
                 self.rep_socket.send(b"ACK")
 
             elif msg_dict['type'] == 'ping':
-                response = {'type': 'ping', 'result': 1}
+                response = {'type': 'ping', 'result': True}
                 self.rep_socket.send_pyobj(response)
 
             else:
-                response = {'type': 'unknown', 'result': 0}
+                response = {'type': 'unknown', 'result': False}
                 self.rep_socket.send_pyobj(response)
 
         # End while. Shutdown broker.
@@ -151,6 +181,7 @@ def get_ip():
     finally:
         s.close()
     return IP
+
 
 class Client:
     def __init__(self,
@@ -178,7 +209,7 @@ class Client:
 
         # Wait for broker response
         ping_response = self.req_socket.recv_pyobj()
-        if ping_response['type'] == 'ping' and ping_response['result'] == 1:
+        if ping_response['type'] == 'ping' and ping_response['result'] is True:
             print('Client init successful')
         else:
             print('Client init failed')
@@ -197,7 +228,7 @@ class Client:
     '''
     def register_pub(self, topic, ownership_strength = 0, history = 0):
         print("Registering publisher with broker")
-        values = {'type': 'pub_reg', 'addr': self.ip, 'topic': topic, 'ownStr': ownership_strength, 'history': history}
+        values = {'type': 'pub_reg', 'addr': self.ip, 'topic': topic, 'ownStr': ownership_strength, 'history_cnt': history}
         self.req_socket.send_pyobj(values)
         response = self.req_socket.recv_pyobj()
         return response
@@ -209,7 +240,7 @@ class Client:
     content: The content that is being published 
     '''
     def publish(self, topic, content):
-        pub_msg = {'type': 'pub', 'topic': topic, 'content': content}
+        pub_msg = {'type': 'pub', 'addr': self.ip, 'topic': topic, 'content': content}
         self.req_socket.send_pyobj(pub_msg)
         response = self.req_socket.recv_pyobj()
         return response
@@ -225,12 +256,18 @@ class Client:
     Returns publisher that the subscriber should subscribe to 
     '''
     def register_sub(self, topic, history = 0):
-        # FIXME: Really dont have to register with broker under current architecture. Just use zmq_setsockopt
         print("Registering subscriber with broker")
-        values = {'type': 'sub_reg', 'topic': topic, 'history': history}
+        values = {'type': 'sub_reg', 'topic': topic, 'history_cnt': history}
         self.req_socket.send_pyobj(values)
         response = self.req_socket.recv_pyobj()
-        return response
+
+        # Check for success
+        print(response)
+        if response['type'] == 'sub_reg' and response['result'] is True:
+            self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, topic)
+            return response['history']
+        else:
+            return None
 
     '''
     Function that the subscriber can use to inform the broker that it has lost the publisher it was connected to;
