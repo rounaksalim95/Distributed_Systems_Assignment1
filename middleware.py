@@ -6,20 +6,21 @@ functions for the publisher, subscriber, and broker to use
 import zmq
 from sortedcontainers import SortedListWithKey
 
-default_broker_control_address = "tcp://*:7777"
-default_broker_sub_address = "tcp://*:7777"
-default_client_address = "tcp://localhost:7777"
+default_broker_pub_address = "tcp://*:7778"
+default_broker_rep_address = "tcp://*:7777"
+client_connect_req_address = "tcp://localhost:7777"
+client_connect_sub_address = "tcp://localhost:7778"
 
 
 class Broker:
     def __init__(self,
-                 control_addr = default_broker_control_address,
-                 sub_addr = default_broker_sub_address):
-        self.control_addr = control_addr
-        self.sub_addr = sub_addr
+                 pub_addr = default_broker_pub_address,
+                 rep_addr = default_broker_rep_address):
+        self.pub_addr = pub_addr
+        self.rep_addr = rep_addr
         self.context = zmq.Context()
-        self.control_socket = self.context.socket(zmq.REP)
-        self.sub_socket = self.context.socket(zmq.SUB)
+        self.pub_socket = self.context.socket(zmq.PUB)
+        self.rep_socket = self.context.socket(zmq.REP)
 
         # Dictionary that topics to sorted lists that keep track of the avaialable publishers
         # (sorted on ownership strength)
@@ -30,10 +31,10 @@ class Broker:
         Returns the bound socket 
         address: Address to bind the socket to (include protocol)
         '''
-        print('Broker binding control socket to ', self.control_addr)
-        self.control_socket.bind(self.control_addr)
-        print('broker binding subscriber socket to ', self.sub_addr)
-        self.sub_socket.bind(self.sub_addr)
+        print('Broker binding pub socket to ', self.pub_addr)
+        self.pub_socket.bind(self.pub_addr)
+        print('Broker binding rep socket to ', self.rep_addr)
+        self.rep_socket.bind(self.rep_addr)
 
     # Some helper functions
     '''
@@ -41,8 +42,8 @@ class Broker:
     socket: Socket to destroy 
     '''
     def stop_listening(self):
-        self.control_socket.destroy()
-        self.sub_socket.destroy()
+        self.pub_socket.destroy()
+        self.rep_socket.destroy()
         print("Sockets destroyed")
 
     '''
@@ -51,12 +52,13 @@ class Broker:
     Publisher is of the form : (address, ownership_strength, history)
     '''
     def add_publisher(self, publisher_info):
-        print(publisher_info)
+        # print(publisher_info)
         topic = publisher_info['topic']
         publisher = (publisher_info['addr'], int(publisher_info['ownStr']), int(publisher_info['history']))
         if topic in self.topics_dict:
             self.topics_dict[topic].add(publisher)
         else:
+            # Created new sorted list sorted by -x[1] (negative of ownership strength)
             self.topics_dict[topic] = SortedListWithKey(key=lambda x: -x[1])
             self.topics_dict[topic].add(publisher)
 
@@ -64,30 +66,63 @@ class Broker:
         # TODO: How to terminate loop?
         # Listen to incoming publisher and subscriber requests
         while True:
-            msg_dict = self.socket.recv_pyobj()
+            msg_dict = self.rep_socket.recv_pyobj()
+            print(msg_dict)
 
             # If publisher makes request then add them to topics_dict appropriately
-            if msg_dict['type'] == 'pub':
+            if msg_dict['type'] == 'pub_reg':
                 self.add_publisher(msg_dict)
-                self.socket.send(b"Added publisher")
+                response = {'type': 'pub_reg', 'result': 1}
+                self.rep_socket.send_pyobj(response)
                 print(self.topics_dict)
 
-            if msg_dict['type'] == 'shutdown:':
+            # No one actually sends this at the moment
+            elif msg_dict['type'] == 'shutdown':
+                response = {'type': 'shutdown', 'result': 1}
+                self.rep_socket.send_pyobj(response)
                 break
+
+            elif msg_dict['type'] == 'ping':
+                response = {'type': 'ping', 'result': 1}
+                self.rep_socket.send_pyobj(response)
+
+            else:
+                response = {'type': 'unknown', 'result': 0}
+                self.rep_socket.send_pyobj(response)
+
         # End while. Shutdown broker.
         self.stop_listening()
 
 
 class Client:
-    def __init__(self, addr = default_client_address, broker_addr = default_broker_address):
-        self.addr = addr
+    def __init__(self,
+                 req_addr = client_connect_req_address,
+                 sub_addr = client_connect_sub_address):
+        self.sub_addr = sub_addr
+        self.req_addr = req_addr
         self.context = zmq.Context()
-        self.pub_socket = self.context.socket(zmq.PUB)
+        self.req_socket = self.context.socket(zmq.REQ)
         self.sub_socket = self.context.socket(zmq.SUB)
 
         # Connect sockets to broker
-        self.pub_socket.connect(broker_addr)
-        # TODO: Connect sub socket to broker pub socket
+        print('Client connecting pub socket to ', self.req_addr)
+        self.req_socket.connect(self.req_addr)
+        print('Client connecting sub socket to ', self.sub_addr)
+        self.sub_socket.connect(self.sub_addr)
+
+        # Subscribe to standard messages
+        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "BROKER_CMD")
+
+        # Send ping to broker
+        ping = {'type': 'ping'}
+        self.req_socket.send_pyobj(ping)
+
+        # Wait for broker response
+        ping_response = self.req_socket.recv_pyobj()
+        if ping_response['type'] == 'ping' and ping_response['result'] == 1:
+            print('Client init successful')
+        else:
+            print('Client init failed')
 
     # Wrapper functions that are useful for the publishers
     '''
@@ -100,13 +135,13 @@ class Client:
     history: The amount of history that the publisher maintains (default value is 0)
     Broker receives values in the following form: address,topic,ownership_strength,history (csv)
     '''
-    def register_pub(self, address, broker_address, topic, ownership_strength = 0, history = 0):
+    def register_pub(self, address, topic, ownership_strength = 0, history = 0):
         print("Registering publisher with broker")
-        values = {'type': 'pub', 'addr': address, 'topic': topic, 'ownStr': ownership_strength, 'history': history}
-        self.pub_socket.send_pyobj(values)
-        response = self.pub_socket.recv()
-        context.destroy()
+        values = {'type': 'pub_reg', 'addr': address, 'topic': topic, 'ownStr': ownership_strength, 'history': history}
+        self.req_socket.send_pyobj(values)
+        response = self.req_socket.recv_pyobj()
         return response
+
 
     # This function is not required if we directly connect the publishers to the subscribers
     '''
@@ -127,15 +162,12 @@ class Client:
     history: The amount of history that the subscriber wants the publisher to maintain (default value is 0)
     Returns publisher that the subscriber should subscribe to 
     '''
-    def register_sub(self, broker_address, topic, history = 0):
-        context = zmq.Context()
+    def register_sub(self, topic, history = 0):
+        # FIXME: Really dont have to register with broker under current architecture. Just use zmq_setsockopt
         print("Registering subscriber with broker")
-        socket = context.socket(zmq.REQ)
-        socket.connect(broker_address)
         values = {'type': 'sub', 'topic': topic, 'history': history}
-        socket.send_pyobj(values)
-        response = socket.recv()
-        context.destroy()
+        self.req_socket.send_pyobj(values)
+        response = self.req_socket.recv_pyobj()
         return response
 
     '''
