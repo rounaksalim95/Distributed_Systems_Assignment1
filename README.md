@@ -5,3 +5,6 @@ PUB SUB Event Service
 * python3
 * pyzmq
 * sortedcontainers
+* zopkio
+* mininet
+* sshd (openssh-server)
