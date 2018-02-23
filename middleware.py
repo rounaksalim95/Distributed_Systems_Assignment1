@@ -250,10 +250,9 @@ class Client:
     '''
     Function that can be called to register the subscriber with the broker 
     Returns the address of the best publisher available 
-    broker_address: Address of the broker that the request needs to be sent to (include protocol)
     topic: Topic that the subscriber wants to subscribe to 
     history: The amount of history that the subscriber wants the publisher to maintain (default value is 0)
-    Returns publisher that the subscriber should subscribe to 
+    Returns publication history if available, or None otherwise
     '''
     def register_sub(self, topic, history = 0):
         print("Registering subscriber with broker")
@@ -261,30 +260,30 @@ class Client:
         self.req_socket.send_pyobj(values)
         response = self.req_socket.recv_pyobj()
 
-        # Check for success
-        print(response)
+        # Check for success. Subscribe to topic regardless
+        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, topic)
         if response['type'] == 'sub_reg' and response['result'] is True:
-            self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, topic)
             return response['history']
         else:
             return None
 
     '''
-    Function that the subscriber can use to inform the broker that it has lost the publisher it was connected to;
-    broker responds by providing next best publisher 
-    Returns the address of the next best publisher available 
-    broker_address: Address of the broker that the request needs to be sent to (include protocol)
-    publisher: The publisher that the subscriber was subscribed to (this can be used by the broker to remove the inactive publisher)
-    topic: Topic that the subscriber wants to subscribe to 
-    history: The amount of history that the subscriber wants the publisher to maintain (default value is 0)
+    Function that the subscriber can use to wait on next available message (Blocking recv essentially)
+    topic: Topic that the subscriber wants to wait for 
+    value: ???
     '''
-    def notify(self, broker_address, publisher, topic, history = 0):
-        context = zmq.Context()
-        print("Notifying broker that the publisher got disconnected")
-        socket = context.socket(zmq.REQ)
-        socket.connect(broker_address)
-        values = "disconnect" + "," + publisher + "," + topic + str(history)
-        socket.send(values.encode())    # encode() uses utf-8 encoding by defualt
-        response = socket.recv()
-        context.destroy()
-        return response
+    def notify(self, topic, value):
+        print("Client waiting for message")
+        recved_topic = self.sub_socket.recv_string()
+        if recved_topic == topic:
+            msg = self.sub_socket.recv_pyobj()
+            print(msg)
+            return msg
+
+        if recved_topic == "BROKER_CMD":
+            # TODO: Respond to Heartbeat
+            pass
+        else:
+            # Discard this message
+            self.sub_socket.recv_pyobj()
+
