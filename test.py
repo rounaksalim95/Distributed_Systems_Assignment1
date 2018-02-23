@@ -10,6 +10,7 @@ result = client.publish("TEST", 25)
 print(result)
 result = client.notify("TEST", 10)
 print(result)
+result = client.notify("TEST", 10)
 # response = middleware.register_sub("tcp://localhost:7777", "Test")
 
 #print(response)

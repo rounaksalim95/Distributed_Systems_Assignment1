@@ -6,12 +6,16 @@ functions for the publisher, subscriber, and broker to use
 import zmq
 import socket
 import collections
+import threading
 from sortedcontainers import SortedListWithKey
+
 
 default_broker_pub_address = "tcp://*:7778"
 default_broker_rep_address = "tcp://*:7777"
 client_connect_req_address = "tcp://localhost:7777"
 client_connect_sub_address = "tcp://localhost:7778"
+
+heartbeat_interval_ms = 1000
 
 
 class Broker:
@@ -28,6 +32,13 @@ class Broker:
         # (sorted on ownership strength)
         self.topics_dict = {}
 
+        # Dictionary for keeping track of clients that are still alive
+        self.hb_mutex = threading.Lock()
+        self.hb_dict = {}
+
+        # Send first heartbeat
+        self.send_hb()
+
         '''
         Funtion that binds a socket for the broker to receive messages from the publishers and subscribers 
         Returns the bound socket 
@@ -39,6 +50,47 @@ class Broker:
         self.rep_socket.bind(self.rep_addr)
 
     # Some helper functions
+    def send_hb(self):
+        topic = "BROKER_CMD"
+        hb_msg = {'type': 'heartbeat'}
+        self.pub_socket.send_string(topic, zmq.SNDMORE)
+        self.pub_socket.send_pyobj(hb_msg)
+
+        # Entries in hb_dict are sorted by ip address.
+        # Each entry is another dict containing 'count' (hb timeout count) and 'topics' (list of published topics)
+        print(self.hb_dict)
+        pub_removal_list = []
+        addr_removal_list = []
+        self.hb_mutex.acquire()
+        for addr, value in self.hb_dict.items():
+            print(value)
+            value['count'] = value['count'] - 1
+
+            # If node has responded before count hits 0, done
+            if value['count'] > 0:
+                continue
+
+            # Else, assume node has died. Find all published topics and mark for removal
+            addr_removal_list.append(addr)
+            for topic in value['topics']:
+                for publisher in self.topics_dict[topic]:
+                    if publisher['addr'] == addr:
+                        pub_removal_list.append(publisher)
+        # Don't like holding a mutex (or mutexes in general) this long, but should always be released.
+        self.hb_mutex.release()
+
+        # Remove associated publisher(s) from topics_dict and remove client node from registered list (HB list)
+        # NOTE: This is done here to prevent changing the size of topics_dict and hb_dict while iterating over them
+        for pub in pub_removal_list:
+            self.topics_dict[topic].remove(pub)
+        for addr in addr_removal_list:
+            self.hb_dict.pop(addr, None)
+
+        # Start next HB timer. Python doesn't seem to offer a reoccuring timer, so this ugly solution is what we get
+        hb_timer = threading.Timer(heartbeat_interval_ms / 1000, self.send_hb)
+        hb_timer.start()
+
+
     '''
     Funtion that destroys the provided socket  
     socket: Socket to destroy 
@@ -55,7 +107,13 @@ class Broker:
     '''
     def add_publisher(self, publisher_info):
         # print(publisher_info)
+        # Verify publisher is part of a registered client
+        publisher_entry = self.hb_dict.get(publisher_info['addr'])
+        if publisher_entry is None:
+            return False
+
         topic = publisher_info['topic']
+        publisher_entry['topics'].append(topic) # Add topic to heartbeat dict
         publisher = {'addr': publisher_info['addr'],
                      'ownStr': int(publisher_info['ownStr']),
                      'history_cnt': int(publisher_info['history_cnt']),
@@ -66,6 +124,8 @@ class Broker:
             # Created new sorted list sorted by -x['ownStr'] (negative of ownership strength)
             self.topics_dict[topic] = SortedListWithKey(key=lambda x: -x['ownStr'])
             self.topics_dict[topic].add(publisher)
+
+        return True
 
     '''
     Function that searches for the best available publisher based on the requirements of the subscriber 
@@ -121,8 +181,8 @@ class Broker:
 
             # If publisher makes request then add them to topics_dict appropriately
             if msg_dict['type'] == 'pub_reg':
-                self.add_publisher(msg_dict)
-                response = {'type': 'pub_reg', 'result': True}
+                result = self.add_publisher(msg_dict)
+                response = {'type': 'pub_reg', 'result': result}
                 self.rep_socket.send_pyobj(response)
                 print(self.topics_dict)
 
@@ -138,11 +198,14 @@ class Broker:
 
             elif msg_dict['type'] == 'pub':
                 publisher = self.find_publisher(msg_dict['topic'], addr=msg_dict['addr'])
-                publisher['history_deque'].append(msg_dict['content'])
-                print(self.topics_dict)
-                self.pub_socket.send_string(msg_dict['topic'], zmq.SNDMORE)
-                self.pub_socket.send_pyobj(msg_dict['content'])
-                response = {'type': 'pub', 'result': True}
+                if publisher is not None:
+                    publisher['history_deque'].append(msg_dict['content'])
+                    print(self.topics_dict)
+                    self.pub_socket.send_string(msg_dict['topic'], zmq.SNDMORE)
+                    self.pub_socket.send_pyobj(msg_dict['content'])
+                    response = {'type': 'pub', 'result': True}
+                else:
+                    response = {'type': 'pub', 'result': False}
                 self.rep_socket.send_pyobj(response)
                 pass
 
@@ -156,8 +219,20 @@ class Broker:
                 self.remove_publisher(msg_dict['addr'], msg_dict['topic'])
                 self.rep_socket.send(b"ACK")
 
+            elif msg_dict['type'] == 'client_reg':
+                response = {'type': 'client_reg', 'result': True}
+                self.hb_dict[ msg_dict['addr'] ] = {'count': 2, 'topics': []}
+                self.rep_socket.send_pyobj(response)
+
             elif msg_dict['type'] == 'ping':
-                response = {'type': 'ping', 'result': True}
+                hb_entry = self.hb_dict.get(msg_dict['addr'])
+                if hb_entry is not None:
+                    self.hb_mutex.acquire()
+                    hb_entry['count'] = 2
+                    self.hb_mutex.release()
+                    response = {'type': 'ping', 'result': True}
+                else:
+                    response = {'type': 'ping', 'result': False}
                 self.rep_socket.send_pyobj(response)
 
             else:
@@ -204,12 +279,12 @@ class Client:
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "BROKER_CMD")
 
         # Send ping to broker
-        ping = {'type': 'ping'}
-        self.req_socket.send_pyobj(ping)
+        reg_msg = {'type': 'client_reg', 'addr': self.ip}
+        self.req_socket.send_pyobj(reg_msg)
 
         # Wait for broker response
-        ping_response = self.req_socket.recv_pyobj()
-        if ping_response['type'] == 'ping' and ping_response['result'] is True:
+        reg_response = self.req_socket.recv_pyobj()
+        if reg_response['type'] == 'client_reg' and reg_response['result'] is True:
             print('Client init successful')
         else:
             print('Client init failed')
@@ -274,16 +349,25 @@ class Client:
     '''
     def notify(self, topic, value):
         print("Client waiting for message")
-        recved_topic = self.sub_socket.recv_string()
-        if recved_topic == topic:
-            msg = self.sub_socket.recv_pyobj()
-            print(msg)
-            return msg
 
-        if recved_topic == "BROKER_CMD":
-            # TODO: Respond to Heartbeat
-            pass
-        else:
-            # Discard this message
-            self.sub_socket.recv_pyobj()
+        # Loop until desired message topic arrives
+        while True:
+            recved_topic = self.sub_socket.recv_string()
+            if recved_topic == topic:
+                # Desired topic arrived. Read message and return.
+                msg = self.sub_socket.recv_pyobj()
+                print(msg)
+                return msg
+
+            if recved_topic == "BROKER_CMD":
+                msg = self.sub_socket.recv_pyobj()
+
+                # Send back ping in response to heartbeat
+                if msg['type'] == 'heartbeat':
+                    ping = {'type': 'ping', 'addr': self.ip}
+                    self.req_socket.send_pyobj(ping)
+                    response = self.req_socket.recv_pyobj()
+            else:
+                # Discard this message
+                self.sub_socket.recv_pyobj()
 
