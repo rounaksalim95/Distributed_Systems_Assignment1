@@ -1,0 +1,10 @@
+{
+    "middlewareType":"client"
+    "commands": [
+        ["w",6],
+        ["rs","topic1",2],
+        ["w",1],
+        ["n","topic1"],
+        ["w",50]
+    ]
+}
