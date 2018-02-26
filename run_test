@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python2
 
 from mininet.net import Mininet
 from mininet.topolib import TreeTopo
@@ -9,6 +9,6 @@ net.start()
 
 for host in net.hosts:
     ip = host.IP()
-    host.cmd(('python3 ./tests/test.py %s &>> log' % ip)+ip[-1]+'.txt &')
+    host.cmd(('python3 ./test.py %s &>> ./tests/log' % ip)+ip[-1]+'.txt &')
 
 net.stop()

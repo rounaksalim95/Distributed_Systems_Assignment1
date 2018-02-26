@@ -25,7 +25,7 @@
 #
 # with the appropriate middleware you are trying to start on that node.
 
-from middleware import Client
+from middleware import Client, Broker
 import sys
 import json
 import time
