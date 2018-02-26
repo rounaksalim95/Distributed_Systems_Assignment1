@@ -1,5 +1,5 @@
 {
-    "middlewareType":"client"
+    "middlewareType":"client",
     "commands": [
         ["w",6],
         ["rs","topic1",2],

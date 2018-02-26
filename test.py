@@ -36,14 +36,18 @@ if len(sys.argv) != 2:
 
 myIP = sys.argv[1]
 
+print("Test.py started, my IP is %s" % myIP)
+
 testScript = json.load(open('./tests/test'+myIP[-1]+'.json'))
 
 if testScript['middlewareType'] == 'broker':
     broker = Broker(pub_addr = 'tcp://'+myIP+':7778',rep_addr = 'tcp://'+myIP+':7777')
+    print("Starting Broker...")
     broker.run()
 
 elif testScript['middlewareType'] == 'client':
     client = Client(req_addr = 'tcp://'+myIP+':7777',sub_addr = 'tcp://'+myIP+':7778')
+    print('Starting Client...')
 
     for command in testScript['commands']:
 
@@ -88,3 +92,4 @@ elif testScript['middlewareType'] == 'client':
         elif command[0] == 'w':
             if len(command) == 2:
                 time.sleep(command[1])
+sys.exit(0)

@@ -2,16 +2,20 @@
 
 from mininet.net import Mininet
 from mininet.topolib import TreeTopo
-import os
+import os, time
 
 currPath = os.path.dirname(os.path.realpath(__file__))
 
 tree = TreeTopo(depth = 1, fanout = 3)
-net = Mininet(topo = tree)
+net = Mininet(topo = tree, xterms = False)
 net.start()
 
 for host in net.hosts:
     ip = host.IP()
-    host.cmd(('python3 '+currPath+'/test.py %s &>> ./tests/log' % ip)+ip[-1]+'.txt &')
+    comm = ('python3 '+currPath+'/test.py %s &> ./log' % ip)+ip[-1]+'.txt &'
+    # comm = 'ls'
+    print(comm)
+    host.sendCmd(comm)
 
+time.sleep(70)
 net.stop()
