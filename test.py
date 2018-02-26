@@ -1,3 +1,4 @@
+print("This string works!")
 # Our test scripts support the following commands, with their expected formats
 # - Register Publisher:
 #     ["rp",<topic string>,<optional: strength>,<optional: history>]
@@ -25,10 +26,12 @@
 #
 # with the appropriate middleware you are trying to start on that node.
 
+
 from middleware import Client, Broker
 import sys
 import json
 import time
+print('TESTTESTTEST')
 
 if len(sys.argv) != 2:
     print("ERROR: test.py wasn\'t given exactly 1 argument")
