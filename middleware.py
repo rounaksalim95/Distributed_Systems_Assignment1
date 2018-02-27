@@ -1,6 +1,6 @@
-''' 
-Middleware that sits on top of zmq and provides thin wrapper 
-functions for the publisher, subscriber, and broker to use 
+'''
+Middleware that sits on top of zmq and provides thin wrapper
+functions for the publisher, subscriber, and broker to use
 '''
 
 import zmq
@@ -40,8 +40,8 @@ class Broker:
         self.send_hb()
 
         '''
-        Funtion that binds a socket for the broker to receive messages from the publishers and subscribers 
-        Returns the bound socket 
+        Funtion that binds a socket for the broker to receive messages from the publishers and subscribers
+        Returns the bound socket
         address: Address to bind the socket to (include protocol)
         '''
         print('Broker binding pub socket to ', self.pub_addr)
@@ -92,8 +92,8 @@ class Broker:
 
 
     '''
-    Funtion that destroys the provided socket  
-    socket: Socket to destroy 
+    Funtion that destroys the provided socket
+    socket: Socket to destroy
     '''
     def stop_listening(self):
         self.pub_socket.destroy()
@@ -102,7 +102,7 @@ class Broker:
 
     '''
     Function that adds the provided publisher to topics_dict
-    publisher_info: Information on the publisher 
+    publisher_info: Information on the publisher
     Publisher is of the form : (address, ownership_strength, history count, history list)
     '''
     def add_publisher(self, publisher_info):
@@ -128,9 +128,9 @@ class Broker:
         return True
 
     '''
-    Function that searches for the best available publisher based on the requirements of the subscriber 
-    topic: Topic that the subscriber wants to subscribe to 
-    history_cnt (Optional): Minimum history that the subscriber is looking for 
+    Function that searches for the best available publisher based on the requirements of the subscriber
+    topic: Topic that the subscriber wants to subscribe to
+    history_cnt (Optional): Minimum history that the subscriber is looking for
     addr (Optional): Unique publisher address desired
     '''
     def find_publisher(self, topic, history_cnt=None, addr=None):
@@ -159,9 +159,9 @@ class Broker:
         return None
 
     '''
-    Function that removes a disconnected publisher from the list of publishers 
-    publisher_addr: Address of the publisher that got disconnected 
-    topic: Topic that the publisher was serving content for  
+    Function that removes a disconnected publisher from the list of publishers
+    publisher_addr: Address of the publisher that got disconnected
+    topic: Topic that the publisher was serving content for
     '''
     def remove_publisher(self, publisher_addr, topic):
         if topic in self.topics_dict and len(self.topics_dict[topic]) > 0:
@@ -292,9 +292,9 @@ class Client:
 
     # Wrapper functions that are useful for the publishers
     '''
-    Function that can be called to register the publisher with the broker 
-    Returns the response received by the broker 
-    address: Address that the publisher is pushing content from 
+    Function that can be called to register the publisher with the broker
+    Returns the response received by the broker
+    address: Address that the publisher is pushing content from
     broker_address: Address of the broker that the request needs to be sent to (include protocol)
     topic: Topic that the publisher is pushing content for
     ownership_strength: The ownership strength of the publisher (default value is 0)
@@ -311,8 +311,8 @@ class Client:
     # This function is not required if we directly connect the publishers to the subscribers
     '''
     Function that the publisher can use to publish data through this middleware/wrapper
-    topic: Topic for which content is being published 
-    content: The content that is being published 
+    topic: Topic for which content is being published
+    content: The content that is being published
     '''
     def publish(self, topic, content):
         pub_msg = {'type': 'pub', 'addr': self.ip, 'topic': topic, 'content': content}
@@ -323,9 +323,9 @@ class Client:
 
     # Wrapper functions that are useful for the subscribers
     '''
-    Function that can be called to register the subscriber with the broker 
-    Returns the address of the best publisher available 
-    topic: Topic that the subscriber wants to subscribe to 
+    Function that can be called to register the subscriber with the broker
+    Returns the address of the best publisher available
+    topic: Topic that the subscriber wants to subscribe to
     history: The amount of history that the subscriber wants the publisher to maintain (default value is 0)
     Returns publication history if available, or None otherwise
     '''
@@ -344,7 +344,7 @@ class Client:
 
     '''
     Function that the subscriber can use to wait on next available message (Blocking recv essentially)
-    topic: Topic that the subscriber wants to wait for 
+    topic: Topic that the subscriber wants to wait for
     value: ???
     '''
     def notify(self, topic, value):
@@ -371,3 +371,14 @@ class Client:
                 # Discard this message
                 self.sub_socket.recv_pyobj()
 
+    def shutdown_broker(self):
+        print("Sending broker shutdown command")
+
+        values = {'type':'shutdown'}
+        self.req_socket.send_pyobj(values)
+        response = self.req_socket.recv_pyobj()
+
+        if response['result'] == True print("Shutdown successful")
+        else print("Shutdown FAILED")
+
+        return response['result']
