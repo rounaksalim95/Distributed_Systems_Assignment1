@@ -18,5 +18,5 @@ for host in net.hosts:
     print(comm)
     host.cmd(comm)
 
-time.sleep(25)
-net.stop()
+time.sleep(15)
+#net.stop()

@@ -39,6 +39,7 @@ class Broker:
         # Send first heartbeat
         self.send_hb()
 
+
         '''
         Funtion that binds a socket for the broker to receive messages from the publishers and subscribers
         Returns the bound socket
@@ -58,12 +59,12 @@ class Broker:
 
         # Entries in hb_dict are sorted by ip address.
         # Each entry is another dict containing 'count' (hb timeout count) and 'topics' (list of published topics)
-        print(self.hb_dict)
+        #print(self.hb_dict)
         pub_removal_list = []
         addr_removal_list = []
         self.hb_mutex.acquire()
         for addr, value in self.hb_dict.items():
-            print(value)
+            #print(value)
             value['count'] = value['count'] - 1
 
             # If node has responded before count hits 0, done
@@ -87,8 +88,8 @@ class Broker:
             self.hb_dict.pop(addr, None)
 
         # Start next HB timer. Python doesn't seem to offer a reoccuring timer, so this ugly solution is what we get
-        hb_timer = threading.Timer(heartbeat_interval_ms / 1000, self.send_hb)
-        hb_timer.start()
+        self.hb_timer = threading.Timer(heartbeat_interval_ms / 1000, self.send_hb)
+        self.hb_timer.start()
 
 
     '''
@@ -96,9 +97,12 @@ class Broker:
     socket: Socket to destroy
     '''
     def stop_listening(self):
-        self.pub_socket.destroy()
-        self.rep_socket.destroy()
-        print("Sockets destroyed")
+        self.pub_socket.close()
+        self.rep_socket.close()
+        print("Sockets closed")
+        self.context.destroy()
+        print("Context destroyed")
+        self.hb_timer.cancel()
 
     '''
     Function that adds the provided publisher to topics_dict
@@ -188,7 +192,7 @@ class Broker:
 
             elif msg_dict['type'] == 'sub_reg':
                 publisher = self.find_publisher(msg_dict['topic'], history_cnt=msg_dict['history_cnt'])
-                print(publisher)
+                print("Matched publisher is: ",publisher)
                 if publisher is not None:
                     response = {'type': 'sub_reg', 'result': True, 'history': publisher['history_deque']}
                     self.rep_socket.send_pyobj(response)  # encode() uses utf-8 encoding by default
@@ -261,10 +265,11 @@ def get_ip():
 class Client:
     def __init__(self,
                  req_addr = client_connect_req_address,
-                 sub_addr = client_connect_sub_address):
+                 sub_addr = client_connect_sub_address,
+                 ip = get_ip()):
         self.sub_addr = sub_addr
         self.req_addr = req_addr
-        self.ip = get_ip()
+        self.ip = ip
         self.context = zmq.Context()
         self.req_socket = self.context.socket(zmq.REQ)
         self.sub_socket = self.context.socket(zmq.SUB)
@@ -378,7 +383,9 @@ class Client:
         self.req_socket.send_pyobj(values)
         response = self.req_socket.recv_pyobj()
 
-        if response['result'] == True print("Shutdown successful")
-        else print("Shutdown FAILED")
+        if response['result'] == True:
+             print("Shutdown successful")
+        else:
+            print("Shutdown FAILED")
 
         return response['result']

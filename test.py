@@ -1,4 +1,3 @@
-print("This string works!")
 # Our test scripts support the following commands, with their expected formats
 # - Register Publisher:
 #     ["rp",<topic string>,<optional: strength>,<optional: history>]
@@ -31,7 +30,6 @@ from middleware import Client, Broker
 import sys
 import json
 import time
-print('TESTTESTTEST')
 
 if len(sys.argv) != 2:
     print("ERROR: test.py wasn\'t given exactly 1 argument")
@@ -41,6 +39,9 @@ myIP = sys.argv[1]
 
 print("Test.py started, my IP is %s" % myIP)
 
+sys.stdout.flush()
+sys.stderr.flush()
+
 testScript = json.load(open('./tests/test'+myIP[-1]+'.json'))
 
 if testScript['middlewareType'] == 'broker':
@@ -49,7 +50,7 @@ if testScript['middlewareType'] == 'broker':
     broker.run()
 
 elif testScript['middlewareType'] == 'client':
-    client = Client(req_addr = 'tcp://'+myIP+':7777',sub_addr = 'tcp://'+myIP+':7778')
+    client = Client(req_addr = 'tcp://10.0.0.1:7777',sub_addr = 'tcp://10.0.0.1:7778', ip = myIP)
     print('Starting Client...')
 
     for command in testScript['commands']:
@@ -95,4 +96,11 @@ elif testScript['middlewareType'] == 'client':
         elif command[0] == 'w':
             if len(command) == 2:
                 time.sleep(command[1])
+
+        # send shutdown broker command
+        elif command[0] == 'sb':
+            results = client.shutdown_broker()
+
+sys.stdout.flush()
+sys.stderr.flush()
 sys.exit(0)
