@@ -17,6 +17,7 @@ client_connect_req_address = "tcp://localhost:7777"
 client_connect_sub_address = "tcp://localhost:7778"
 
 heartbeat_interval_ms = 1000
+starting_heartbeat_count = 3
 
 
 class Broker:
@@ -60,7 +61,6 @@ class Broker:
 
         # Entries in hb_dict are sorted by ip address.
         # Each entry is another dict containing 'count' (hb timeout count) and 'topics' (list of published topics)
-        #print(self.hb_dict)
         pub_removal_list = []
         addr_removal_list = []
         self.hb_mutex.acquire()
@@ -238,14 +238,14 @@ class Broker:
 
             elif msg_dict['type'] == 'client_reg':
                 response = {'type': 'client_reg', 'result': True}
-                self.hb_dict[ msg_dict['addr'] ] = {'count': 2, 'topics': []}
+                self.hb_dict[ msg_dict['addr'] ] = {'count': starting_heartbeat_count, 'topics': []}
                 self.rep_socket.send_pyobj(response)
 
             elif msg_dict['type'] == 'ping':
                 hb_entry = self.hb_dict.get(msg_dict['addr'])
                 if hb_entry is not None:
                     self.hb_mutex.acquire()
-                    hb_entry['count'] = 2
+                    hb_entry['count'] = starting_heartbeat_count
                     self.hb_mutex.release()
                     response = {'type': 'ping', 'result': True}
                 else:
