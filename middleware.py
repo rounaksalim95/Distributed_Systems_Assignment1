@@ -208,10 +208,16 @@ class Broker:
             elif msg_dict['type'] == 'pub':
                 publisher = self.find_publisher(msg_dict['topic'], addr=msg_dict['addr'])
                 if publisher is not None:
+                    # Add to history regardless of ownership strength
                     publisher['history_deque'].append(msg_dict['content'])
                     # print(self.topics_dict)
-                    self.pub_socket.send_string(msg_dict['topic'], zmq.SNDMORE)
-                    self.pub_socket.send_pyobj(msg_dict['content'])
+
+                    # Only send publication to subs if this is the highest ownership publisher
+                    highestPub = (self.topics_dict['topic'])[0]
+                    if publisher['ownStr'] >= highestPub['ownStr']:
+                        self.pub_socket.send_string(msg_dict['topic'], zmq.SNDMORE)
+                        self.pub_socket.send_pyobj(msg_dict['content'])
+
                     response = {'type': 'pub', 'result': True}
                 else:
                     response = {'type': 'pub', 'result': False}
