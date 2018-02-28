@@ -21,4 +21,4 @@ for host in net.hosts:
 
 print "\nRunning test..."
 time.sleep(MAX_RUNTIME)
-# net.stop()
+net.stop()
