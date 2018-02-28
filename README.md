@@ -11,6 +11,8 @@ PUB SUB Event Service
 Create a test script for each node, see notes in tests/test.py
 Once your scripts are created, run "sudo ./run_test"
 
+Our supplied scripts show history being returned and a publisher with lower ownership strength taking over when a publisher with higher ownership strength times out.
+
 This file has to be modified to fit your test a little bit. Near the top are two macros, "NUM_NODES" and "MAX_RUNTIME".
 
 "NUM_NODES" is the number of nodes in your test, and you should have a matching number of test<node number>.json's in the "/tests" directory.

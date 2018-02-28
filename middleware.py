@@ -213,10 +213,12 @@ class Broker:
                     # print(self.topics_dict)
 
                     # Only send publication to subs if this is the highest ownership publisher
-                    highestPub = (self.topics_dict['topic'])[0]
+                    highestPub = (self.topics_dict.get(msg_dict['topic']))[0]
+                    # print("Highest pub: ",highestPub)
                     if publisher['ownStr'] >= highestPub['ownStr']:
                         self.pub_socket.send_string(msg_dict['topic'], zmq.SNDMORE)
                         self.pub_socket.send_pyobj(msg_dict['content'])
+
 
                     response = {'type': 'pub', 'result': True}
                 else:
