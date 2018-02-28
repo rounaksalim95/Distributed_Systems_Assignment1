@@ -4,19 +4,20 @@ from mininet.net import Mininet
 from mininet.topolib import TreeTopo
 import os, time
 
+NUM_NODES = 4
+MAX_RUNTIME = 25
+
 currPath = os.getcwd()
 
-tree = TreeTopo(depth = 1, fanout = 3)
+tree = TreeTopo(depth = 1, fanout = NUM_NODES)
 net = Mininet(topo = tree, xterms = False)
 net.start()
 
 for host in net.hosts:
     ip = host.IP()
     comm = ('python3 ./test.py %s &> ./log' % ip)+ip[-1]+'.txt &'
-    # comm = ('python3 ./tester.py %s &> ./log' % ip)+ip[-1]+'.txt'
-    # comm = 'ls'
-    print(comm)
     host.cmd(comm)
 
-time.sleep(15)
-# net.stop()
+print("\nRunning test for ",MAX_RUNTIME," seconds...\n")
+time.sleep(MAX_RUNTIME)
+net.stop()
