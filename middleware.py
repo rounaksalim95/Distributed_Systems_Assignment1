@@ -86,6 +86,7 @@ class Broker:
             self.topics_dict[topic].remove(pub)
         for addr in addr_removal_list:
             self.hb_dict.pop(addr, None)
+            print("removed ",addr," from hb_dict")
 
         # Start next HB timer. Python doesn't seem to offer a reoccuring timer, so this ugly solution is what we get
         self.hb_timer = threading.Timer(heartbeat_interval_ms / 1000, self.send_hb)
@@ -113,6 +114,7 @@ class Broker:
         # print(publisher_info)
         # Verify publisher is part of a registered client
         publisher_entry = self.hb_dict.get(publisher_info['addr'])
+        print("Publisher entry is :", publisher_entry)
         if publisher_entry is None:
             return False
 
@@ -138,6 +140,8 @@ class Broker:
     addr (Optional): Unique publisher address desired
     '''
     def find_publisher(self, topic, history_cnt=None, addr=None):
+        print("topics_dict is: ",self.topics_dict)
+        print("Hist count and topic are: ", history_cnt,topic)
         if topic in self.topics_dict and len(self.topics_dict[topic]) > 0:
             for publisher in self.topics_dict[topic]:
                 if history_cnt is not None:
@@ -275,7 +279,7 @@ class Client:
         self.sub_socket = self.context.socket(zmq.SUB)
 
         # Connect sockets to broker
-        print('Client connecting pub socket to ', self.req_addr)
+        print('Client connecting req socket to ', self.req_addr)
         self.req_socket.connect(self.req_addr)
         print('Client connecting sub socket to ', self.sub_addr)
         self.sub_socket.connect(self.sub_addr)

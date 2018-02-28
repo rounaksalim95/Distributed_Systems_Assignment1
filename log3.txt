@@ -1,4 +1,2 @@
-Traceback (most recent call last):
-  File "./tests/test.py", line 28, in <module>
-    from middleware import Client
-ImportError: No module named 'middleware'
+TESTTESTTEST
+Test.py started, my IP is 10.0.0.3

@@ -32,7 +32,7 @@ import json
 import time
 
 if len(sys.argv) != 2:
-    print("ERROR: test.py wasn\'t given exactly 1 argument")
+    print("ERROR: test.py wasn\'t given exactly 1 argument (IP addr)")
     sys.exit(-1)
 
 myIP = sys.argv[1]
@@ -71,7 +71,7 @@ elif testScript['middlewareType'] == 'client':
             topic = command[1]
             hist  = command[2] if len(command) >= 3 else 0
 
-            results = client.register_sub(topic,hist)
+            results = client.register_sub(topic,history = hist)
             print(results)
 
         # publish
