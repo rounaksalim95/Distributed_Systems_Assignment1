@@ -89,13 +89,16 @@ elif testScript['middlewareType'] == 'client':
             topic = command[1]
             val = command[2] if len(command) >= 3 else 0
 
-            results = client.notify(topic,val)
+            results = client.notify(topic, val)
             print(results)
 
         # pause, in seconds
         elif command[0] == 'w':
             if len(command) == 2:
-                time.sleep(command[1])
+                # Have client sleep by waiting for message of topic "" with timeout
+                # This allows client to continue responding to heartbeats
+                sleep_ms = int(command[1]*1000) #Convert to milliseconds
+                client.notify("", 0, timeout_ms=sleep_ms)
 
         # send shutdown broker command
         elif command[0] == 'sb':

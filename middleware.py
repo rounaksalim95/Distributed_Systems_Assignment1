@@ -7,6 +7,7 @@ import zmq
 import socket
 import collections
 import threading
+import time
 from sortedcontainers import SortedListWithKey
 
 
@@ -356,19 +357,38 @@ class Client:
     topic: Topic that the subscriber wants to wait for
     value: ???
     '''
-    def notify(self, topic, value):
+    def notify(self, topic, value, timeout_ms=0):
         print("Client waiting for message")
+
+        # Set absolute time limits for timeout (pyzmq uses relative timeouts)
+        start_time = int(round(time.time() * 1000))
+        end_time = start_time + timeout_ms
 
         # Loop until desired message topic arrives
         while True:
-            recved_topic = self.sub_socket.recv_string()
+            # If timeout specified, determine remaining time. Otherwise, block indefinitely
+            if timeout_ms > 0:
+                remaining_time = end_time - int(round(time.time() * 1000))
+                if remaining_time <= 0:
+                    return None
+            else:
+                remaining_time = -1
+            self.sub_socket.RCVTIMEO = remaining_time
+
+            # Try to recv message. Catch timeout
+            try:
+                recved_topic = self.sub_socket.recv_string()
+            except zmq.error.Again:
+                return None
+
+            # Desired topic arrived. Read message and return.
             if recved_topic == topic:
-                # Desired topic arrived. Read message and return.
-                msg = self.sub_socket.recv_pyobj()
+                msg = self.sub_socket.recv_pyobj(zmq.NOBLOCK)
                 print(msg)
                 return msg
 
-            if recved_topic == "BROKER_CMD":
+            # Handle special broker topic regardless of desired topic
+            elif recved_topic == "BROKER_CMD":
                 msg = self.sub_socket.recv_pyobj()
 
                 # Send back ping in response to heartbeat
@@ -376,8 +396,9 @@ class Client:
                     ping = {'type': 'ping', 'addr': self.ip}
                     self.req_socket.send_pyobj(ping)
                     response = self.req_socket.recv_pyobj()
+
+            # Discard all other messages
             else:
-                # Discard this message
                 self.sub_socket.recv_pyobj()
 
     def shutdown_broker(self):
