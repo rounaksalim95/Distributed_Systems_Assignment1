@@ -72,7 +72,7 @@ elif testScript['middlewareType'] == 'client':
             hist  = command[2] if len(command) >= 3 else 0
 
             results = client.register_sub(topic,history = hist)
-            print(results)
+            print("Subscriber registration received history: ", results)
 
         # publish
         elif command[0] == 'p':
@@ -81,7 +81,7 @@ elif testScript['middlewareType'] == 'client':
             content = command[2]
 
             results = client.publish(topic,content)
-            print(results)
+            print("Publish result: ",results)
 
         # notify
         elif command[0] == 'n':
@@ -90,7 +90,7 @@ elif testScript['middlewareType'] == 'client':
             val = command[2] if len(command) >= 3 else 0
 
             results = client.notify(topic, val)
-            print(results)
+            print("Notify received: ",results)
 
         # pause, in seconds
         elif command[0] == 'w':

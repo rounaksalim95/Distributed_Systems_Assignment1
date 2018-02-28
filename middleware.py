@@ -101,9 +101,9 @@ class Broker:
     def stop_listening(self):
         self.pub_socket.close()
         self.rep_socket.close()
-        print("Sockets closed")
+        # print("Sockets closed")
         self.context.destroy()
-        print("Context destroyed")
+        # print("Context destroyed")
         self.hb_timer.cancel()
 
     '''
@@ -141,8 +141,8 @@ class Broker:
     addr (Optional): Unique publisher address desired
     '''
     def find_publisher(self, topic, history_cnt=None, addr=None):
-        print("topics_dict is: ",self.topics_dict)
-        print("Hist count and topic are: ", history_cnt,topic)
+        # print("topics_dict is: ",self.topics_dict)
+        # print("Hist count and topic are: ", history_cnt,topic)
         if topic in self.topics_dict and len(self.topics_dict[topic]) > 0:
             for publisher in self.topics_dict[topic]:
                 if history_cnt is not None:
@@ -193,11 +193,11 @@ class Broker:
                 result = self.add_publisher(msg_dict)
                 response = {'type': 'pub_reg', 'result': result}
                 self.rep_socket.send_pyobj(response)
-                print(self.topics_dict)
+                # print(self.topics_dict)
 
             elif msg_dict['type'] == 'sub_reg':
                 publisher = self.find_publisher(msg_dict['topic'], history_cnt=msg_dict['history_cnt'])
-                print("Matched publisher is: ",publisher)
+                #print("Matched publisher is: ",publisher)
                 if publisher is not None:
                     response = {'type': 'sub_reg', 'result': True, 'history': publisher['history_deque']}
                     self.rep_socket.send_pyobj(response)  # encode() uses utf-8 encoding by default
@@ -209,7 +209,7 @@ class Broker:
                 publisher = self.find_publisher(msg_dict['topic'], addr=msg_dict['addr'])
                 if publisher is not None:
                     publisher['history_deque'].append(msg_dict['content'])
-                    print(self.topics_dict)
+                    # print(self.topics_dict)
                     self.pub_socket.send_string(msg_dict['topic'], zmq.SNDMORE)
                     self.pub_socket.send_pyobj(msg_dict['content'])
                     response = {'type': 'pub', 'result': True}
@@ -358,7 +358,7 @@ class Client:
     value: ???
     '''
     def notify(self, topic, value, timeout_ms=0):
-        print("Client waiting for message")
+        # print("Client waiting for message")
 
         # Set absolute time limits for timeout (pyzmq uses relative timeouts)
         start_time = int(round(time.time() * 1000))
@@ -384,7 +384,7 @@ class Client:
             # Desired topic arrived. Read message and return.
             if recved_topic == topic:
                 msg = self.sub_socket.recv_pyobj(zmq.NOBLOCK)
-                print(msg)
+                # print(msg)
                 return msg
 
             # Handle special broker topic regardless of desired topic
