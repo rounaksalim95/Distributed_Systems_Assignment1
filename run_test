@@ -15,9 +15,10 @@ net.start()
 
 for host in net.hosts:
     ip = host.IP()
+    print(ip)
     comm = ('python3 ./test.py %s &> ./log' % ip)+ip[-1]+'.txt &'
     host.cmd(comm)
 
-print("\nRunning test for ",MAX_RUNTIME," seconds...\n")
+print "\nRunning test..."
 time.sleep(MAX_RUNTIME)
-net.stop()
+# net.stop()
