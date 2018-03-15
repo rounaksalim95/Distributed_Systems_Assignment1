@@ -1,10 +1,10 @@
-# Distributed_Systems_Assignment1
+# Distributed Systems Assignment 1
 Publish/Subscribe event service that uses a central Broker as a middleman for all messaging between Clients (publishers and subscribers).
 
 The library is implemented entirely in the middleware.py file. 
 The API consists of the two classes "Broker" and "Client".
 
-The single Broker accepts incoming messages on port 7777 and sends messages out to subscribers on port 7778.
+A single Broker accepts incoming messages on port 7777 and sends messages out to subscribers on port 7778.
 All messages sent by a publisher are directed to the Broker.
 The Broker maintains active publishers, topics, ownership strengths, and histories.
 When the Broker receives a message from a publisher, it routes this message to all subscribers of the message topic as appropraite.
@@ -28,11 +28,12 @@ To use the library:
 * pyzmq
 * sortedcontainers
 * Mininet
+* python2 (for testing)
 
 ## Testing
 We use a script-based testing framework to support testing a variety of functions/scenarios. 
 Test cases are contained in the "tests" folder.
 
-The command "sudo ./run_tests" will run all tests and store the result of each test into a log file in the directory of that test.
+The command "sudo ./run_tests" will run all tests and store the result of each test into log files in the directory of that test.
 
 More information about the test scripts is given in the "tests" directory readme.
