@@ -1,0 +1,1 @@
+Test 1 shows history being returned and a publisher with lower ownership strength taking over when a publisher with higher ownership strength times out.

@@ -1,5 +1,27 @@
 # Distributed_Systems_Assignment1
-PUB SUB Event Service
+Publish/Subscribe event service that uses a central Broker as a middleman for all messaging between Clients (publishers and subscribers).
+
+The library is implemented entirely in the middleware.py file. 
+The API consists of the two classes "Broker" and "Client".
+
+The single Broker accepts incoming messages on port 7777 and sends messages out to subscribers on port 7778.
+All messages sent by a publisher are directed to the Broker.
+The Broker maintains active publishers, topics, ownership strengths, and histories.
+When the Broker receives a message from a publisher, it routes this message to all subscribers of the message topic as appropraite.
+
+When an instance of "Client" is created, the client automatically identifies itself to the broker.
+The Client constructor will block until this identification is complete (typically <1 second on mininet).
+Once this completes, the Client may register as many publishers and subscribers with the Broker as desired.
+Each publisher registration should include the topic, ownership strength, and history of that publisher.
+Each subscriber registration should include the topic and desired amount of history.
+If the desired history is available, the Broker will respond with a list containing the history.
+
+To use the library: 
+1) Spawn one instance of "Broker" on any node.
+2) Spawn as many instances of "Client" as desired on other nodes in the network, and specify the IP address of the Broker to each Client.
+3) Each Client node may then register as many publishers and subscribers as desired and begin publishing/receiving messages.
+4) See comments in middleware.py for a more detailed description of each available function.
+ 
 
 ## Requirements
 * python3
@@ -8,21 +30,9 @@ PUB SUB Event Service
 * Mininet
 
 ## Testing
-Create a test script for each node, see notes in tests/test.py
-Once your scripts are created, run "sudo ./run_test"
+We use a script-based testing framework to support testing a variety of functions/scenarios. 
+Test cases are contained in the "tests" folder.
 
-Our supplied scripts show history being returned and a publisher with lower ownership strength taking over when a publisher with higher ownership strength times out.
+The command "sudo ./run_tests" will run all tests and store the result of each test into a log file in the directory of that test.
 
-This file has to be modified to fit your test a little bit. Near the top are two macros, "NUM_NODES" and "MAX_RUNTIME".
-
-"NUM_NODES" is the number of nodes in your test, and you should have a matching number of test<node number>.json's in the "/tests" directory.
-
-"MAX_RUNTIME" should be an integer, a couple seconds longer than the largest sum of "wait" and "notify" statements in any test json. This gives your test ample time to run before we tear down the mininet setup.
-
-IMPORTANT: This longest json should also end with a command "sb", which stops the broker gracefully, otherwise you may not be able to view the broker log.
-
-Test scripts are json files named "test<node number>.json". We only support at most 9 nodes right now. They have two dict-like entries, "middlewareType" and "commands". "middlewareType" can hold value either "client" or "broker". "commands" holds a list of sublists, where each sublist is a command to be run by a client. A "broker" test script doesn't need a "command" list, the broker just starts and blocks.
-
-Each command "sublist" format is specified in test.py.
-
-Each node produces a log called "log<node number>.txt", in this directory.
+More information about the test scripts is given in the "tests" directory readme.

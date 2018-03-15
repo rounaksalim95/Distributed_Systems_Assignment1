@@ -31,18 +31,19 @@ import sys
 import json
 import time
 
-if len(sys.argv) != 2:
-    print("ERROR: test.py wasn\'t given exactly 1 argument (IP addr)")
+if len(sys.argv) != 3:
+    print("ERROR: test.py wasn\'t given exactly 2 arguments (IP addr, script file)")
     sys.exit(-1)
 
 myIP = sys.argv[1]
+testScriptFile = sys.argv[2]
 
-print("Test.py started, my IP is %s" % myIP)
+print("Test.py started, my IP is %s. Using test script %s" % (myIP, testScriptFile))
 
 sys.stdout.flush()
 sys.stderr.flush()
 
-testScript = json.load(open('./tests/test'+myIP[-1]+'.json'))
+testScript = json.load(open(testScriptFile))
 
 if testScript['middlewareType'] == 'broker':
     broker = Broker(pub_addr = 'tcp://'+myIP+':7778',rep_addr = 'tcp://'+myIP+':7777')
