@@ -11,9 +11,9 @@ Currently, the Broker must be run on node1 so the "node1.json" should always con
         "middlewareType":"broker"
     }
 
-## Config.json
+## config.json
 
-Config.json needs to define two values:
+config.json needs to define two values:
 1) NUM_NODES
 2) MAX_RUNTIME
 
@@ -59,7 +59,7 @@ A "broker" test script doesn't need a "command" list, the broker just starts and
 
 Each command "sublist" format (ie. command arguments) is specified in test.py.
 
-**IMPORTANT**: This longest json should also end with a command "sb", which stops the broker gracefully, otherwise you may not be able to view the broker log.
+***IMPORTANT***: This longest json should also end with a command "sb", which stops the broker gracefully, otherwise you may not be able to view the broker log.
 
 Each node produces a log called "log<node number>.txt", in this directory.
 
