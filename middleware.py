@@ -129,7 +129,7 @@ class Broker:
             self.topics_dict[topic].add(publisher)
         else:
             # Created new sorted list sorted by -x['ownStr'] (negative of ownership strength)
-            self.topics_dict[topic] = SortedListWithKey(key=lambda x: -x['ownStr'])
+            self.topics_dict[topic] = SortedListWithKey(key=lambda x: x['ownStr'])
             self.topics_dict[topic].add(publisher)
 
         return True
