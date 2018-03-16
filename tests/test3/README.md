@@ -5,16 +5,17 @@ log2.txt should show the history list:
 
 Node 2 should then receive the following series of messages:
 
-    Notify received:  8
-    Notify received:  9
-    Notify received:  10
-    Notify received:  10
-    Notify received:  10
-    Notify received:  10
-    Notify received:  10
-    Notify received:  -1
-    Notify received:  -1
-    Notify received:  -1 
+Notify received:  7
+Notify received:  8
+Notify received:  9
+Notify received:  10
+Notify received:  10
+Notify received:  10
+Notify received:  10
+Notify received:  10
+Notify received:  10
+Notify received:  10
+
 
 Nodes 3  should each publish a series of approximately 10 messages.
 
