@@ -188,16 +188,16 @@ class Broker:
             msg_dict = self.rep_socket.recv_pyobj()
             print(msg_dict)
 
-            # If publisher makes request then add them to topics_dict appropriately
+            # If new publisher registers, then add them to topics_dict appropriately
             if msg_dict['type'] == 'pub_reg':
                 result = self.add_publisher(msg_dict)
                 response = {'type': 'pub_reg', 'result': result}
                 self.rep_socket.send_pyobj(response)
                 # print(self.topics_dict)
 
+            # If new subscriber registration received, try to find suitable publisher with desired history
             elif msg_dict['type'] == 'sub_reg':
                 publisher = self.find_publisher(msg_dict['topic'], history_cnt=msg_dict['history_cnt'])
-                #print("Matched publisher is: ",publisher)
                 if publisher is not None:
                     response = {'type': 'sub_reg', 'result': True, 'history': publisher['history_deque']}
                     self.rep_socket.send_pyobj(response)  # encode() uses utf-8 encoding by default
@@ -205,10 +205,14 @@ class Broker:
                     response = {'type': 'sub_reg', 'result': False}
                     self.rep_socket.send_pyobj(response)
 
+            # Received message to publish
             elif msg_dict['type'] == 'pub':
+                # Find which publisher sent message
                 publisher = self.find_publisher(msg_dict['topic'], addr=msg_dict['addr'])
+
+                # If the publisher is valid (has up-to-date registration)
                 if publisher is not None:
-                    # Add to history regardless of ownership strength
+                    # Add to this publisher's history regardless of ownership strength
                     publisher['history_deque'].append(msg_dict['content'])
                     # print(self.topics_dict)
 
@@ -219,28 +223,30 @@ class Broker:
                         self.pub_socket.send_string(msg_dict['topic'], zmq.SNDMORE)
                         self.pub_socket.send_pyobj(msg_dict['content'])
 
-
                     response = {'type': 'pub', 'result': True}
                 else:
+                    # Failed to find valid publisher
                     response = {'type': 'pub', 'result': False}
                 self.rep_socket.send_pyobj(response)
-                pass
 
-            # No one actually sends this at the moment
+            # Shutdown message. Cleanup and shutdown broker
             elif msg_dict['type'] == 'shutdown':
                 response = {'type': 'shutdown', 'result': True}
                 self.rep_socket.send_pyobj(response)
                 break
 
+            # Publisher has notified broker that it will no longer be publishing
             elif msg_dict['type'] == 'disconnect':
                 self.remove_publisher(msg_dict['addr'], msg_dict['topic'])
                 self.rep_socket.send(b"ACK")
 
+            # New client registration request. Add to heartbeat dict
             elif msg_dict['type'] == 'client_reg':
                 response = {'type': 'client_reg', 'result': True}
                 self.hb_dict[ msg_dict['addr'] ] = {'count': starting_heartbeat_count, 'topics': []}
                 self.rep_socket.send_pyobj(response)
 
+            # Response to heartbeat message
             elif msg_dict['type'] == 'ping':
                 hb_entry = self.hb_dict.get(msg_dict['addr'])
                 if hb_entry is not None:
@@ -252,6 +258,7 @@ class Broker:
                     response = {'type': 'ping', 'result': False}
                 self.rep_socket.send_pyobj(response)
 
+            # Unknown message type
             else:
                 response = {'type': 'unknown', 'result': False}
                 self.rep_socket.send_pyobj(response)
