@@ -6,6 +6,9 @@ Node 2 should then receive the following series of messages:
 
 
 Node 4 should then receive the following series of messages:
+Notify received:  9
+Notify received:  10
+Notify received:  10
 
 
 
