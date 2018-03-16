@@ -4,16 +4,6 @@ log2.txt and log4.txt should show the history list:
 
 Node 2 should then receive the following series of messages:
 
-    Notify received:  8
-    Notify received:  9
-    Notify received:  10
-    Notify received:  10
-    Notify received:  10
-    Notify received:  10
-    Notify received:  10
-    Notify received:  -1
-    Notify received:  -1
-    Notify received:  -1
 
 Node 4 should then receive the following series of messages:
 
