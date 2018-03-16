@@ -1,0 +1,28 @@
+{
+    "middlewareType":"client",
+    "commands": [
+        ["w",5],
+        ["rs","topic1",3],
+        ["w",1],
+        ["n","topic1"],
+        ["w",1],
+        ["n","topic1"],
+        ["w",1],
+        ["n","topic1"],
+        ["w",1],
+        ["n","topic1"],
+        ["w",1],
+        ["n","topic1"],
+        ["w",1],
+        ["n","topic1"],
+        ["w",1],
+        ["n","topic1"],
+        ["w",1],
+        ["n","topic1"],
+        ["w",1],
+        ["n","topic1"],
+        ["w",1],
+        ["n","topic1"],
+        ["w",1]
+    ]
+}
